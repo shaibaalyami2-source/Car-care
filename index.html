@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>العناية لخدمات السيارات | نظام الكاشير وإدارة الورشة</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: { extend: {
+    colors: {
+      navy: { 800: '#1E3E62', 900: '#0B192C', 950: '#050c17' },
+      brandOrange: { 400: '#FF8A00', 500: '#FF6500', 600: '#CC5100' }
+    },
+    fontFamily: { sans: ['Tajawal', 'Segoe UI', 'sans-serif'] }
+  } }
+}
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #FF6500; border-radius: 4px; }
+  .inp { width:100%; border-radius:.6rem; padding:.45rem .65rem; font-size:.75rem; outline:none; border:1px solid #d1d5db; background:#fff; color:#1f2937; }
+  .dark .inp { background:#0B192C; border-color:#374151; color:#f3f4f6; }
+  .inp:focus { box-shadow:0 0 0 2px #FF6500; }
+  .lbl { display:block; font-size:10px; color:#9ca3af; margin-bottom:2px; font-weight:700; }
+  .spin { width:28px; height:28px; border:3px solid rgba(255,101,0,.25); border-top-color:#FF6500; border-radius:50%; animation:sp .8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  @media print {
+    body * { visibility: hidden; }
+    #receipt-print-area, #receipt-print-area * { visibility: visible; }
+    #receipt-print-area { position:absolute; left:0; top:0; width:80mm; padding:8px; background:#fff !important; color:#000 !important; font-size:11px; line-height:1.3; }
+    @page { size: 80mm auto; margin: 0; }
+  }
+</style>
+</head>
+<body class="bg-gray-100 dark:bg-navy-900 text-gray-800 dark:text-gray-100 h-screen flex flex-col overflow-hidden">
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-screen" class="fixed inset-0 z-[60] bg-navy-950 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm bg-navy-800 rounded-2xl p-6 border border-brandOrange-500/30 shadow-2xl text-white">
+    <div class="flex flex-col items-center mb-5">
+      <div id="login-logo" class="w-20 h-20 bg-navy-900 rounded-2xl p-2 border border-brandOrange-500 mb-3"></div>
+      <h1 class="font-black text-2xl">العناية</h1>
+      <span class="text-xs bg-brandOrange-500 font-bold px-2 py-0.5 rounded-md mt-1">لخدمات السيارات</span>
+      <p class="text-xs text-gray-400 mt-3">نظام الكاشير وإدارة الورشة</p>
+    </div>
+    <form id="login-form" class="space-y-3" onsubmit="event.preventDefault(); submitAuth();">
+      <h2 id="auth-title" class="text-sm font-black text-center">تسجيل الدخول</h2>
+      <div data-mode="signup"><label class="lbl">الاسم الكامل</label><input id="login-name" autocomplete="name" class="inp"></div>
+      <div data-mode="signin signup forgot reset"><label class="lbl">البريد الإلكتروني</label><input id="login-email" type="email" autocomplete="username" class="inp" dir="ltr"></div>
+      <div data-mode="reset"><label class="lbl">الرمز المرسل إلى بريدك</label><input id="login-otp" inputmode="numeric" autocomplete="one-time-code" class="inp text-center tracking-[.5em] font-bold" dir="ltr" maxlength="8"></div>
+      <div data-mode="signin signup reset newpass"><label class="lbl" id="pass-label">كلمة المرور</label><input id="login-pass" type="password" autocomplete="current-password" class="inp" dir="ltr"></div>
+      <p id="login-error" class="hidden text-xs text-red-400 font-bold"></p>
+      <p id="login-info" class="hidden text-xs text-emerald-400 font-bold"></p>
+      <button id="login-btn" type="submit" class="w-full bg-brandOrange-500 hover:bg-brandOrange-600 font-extrabold py-2.5 rounded-xl text-sm transition">تسجيل الدخول</button>
+      <div class="flex justify-between text-[11px] text-gray-400 pt-1">
+        <button type="button" id="link-a" class="hover:text-brandOrange-400 font-bold"></button>
+        <button type="button" id="link-b" class="hover:text-brandOrange-400 font-bold"></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== LOADING ===================== -->
+<div id="loading-screen" class="hidden fixed inset-0 z-[55] bg-navy-950/90 flex flex-col items-center justify-center gap-3 text-white">
+  <div class="spin"></div><p class="text-xs text-gray-300" id="loading-text">جاري تحميل البيانات...</p>
+</div>
+
+<!-- ===================== HEADER ===================== -->
+<header class="bg-white dark:bg-navy-800 border-b border-gray-200 dark:border-gray-700/80 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-md z-20">
+  <div class="flex items-center gap-3">
+    <div id="header-logo" class="w-11 h-11 bg-navy-900 rounded-xl p-1.5 border border-brandOrange-500 shadow-md"></div>
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="font-black text-xl leading-none text-navy-900 dark:text-white" id="header-store">العناية</h1>
+        <span class="text-xs bg-brandOrange-500 text-white font-bold px-2 py-0.5 rounded-md">لخدمات السيارات</span>
+      </div>
+      <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 hidden sm:flex items-center gap-2">
+        <span>س.ت: <strong id="header-cr" class="font-mono">—</strong></span><span>•</span>
+        <span>الرقم الضريبي: <strong id="header-vat" class="font-mono">—</strong></span>
+      </p>
+    </div>
+  </div>
+
+  <nav class="hidden lg:flex items-center gap-1 bg-gray-100 dark:bg-navy-900/80 p-1 rounded-xl border border-gray-200 dark:border-gray-700" id="desk-nav"></nav>
+
+  <div class="flex items-center gap-2">
+    <button id="shift-badge" onclick="onShiftBadge()" class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-bold"></button>
+    <button id="btn-staff" onclick="openStaff()" class="hidden p-2 rounded-xl bg-gray-100 dark:bg-navy-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-navy-700 relative" title="الموظفون والصلاحيات">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span id="staff-pending" class="hidden absolute -top-1 -left-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center"></span>
+    </button>
+    <button id="btn-settings" onclick="openSettings()" class="hidden p-2 rounded-xl bg-gray-100 dark:bg-navy-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-navy-700" title="إعدادات المنشأة">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+    <button onclick="toggleDarkMode()" class="p-2 rounded-xl bg-gray-100 dark:bg-navy-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-navy-700" title="تبديل المظهر">
+      <svg class="w-5 h-5 hidden dark:block text-brandOrange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      <svg class="w-5 h-5 block dark:hidden text-navy-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+    </button>
+    <div class="flex items-center gap-2 bg-gray-100 dark:bg-navy-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div id="user-avatar" class="w-7 h-7 rounded-lg bg-brandOrange-500 text-white flex items-center justify-center font-bold text-xs">؟</div>
+      <div class="text-right hidden sm:block">
+        <div class="text-xs font-bold leading-tight" id="user-name">—</div>
+        <div class="text-[10px] text-gray-400" id="user-role">—</div>
+      </div>
+      <button onclick="doLogout()" class="text-gray-400 hover:text-red-500 mr-1" title="تسجيل الخروج">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="flex lg:hidden bg-white dark:bg-navy-800 border-b border-gray-200 dark:border-gray-700 overflow-x-auto p-1.5 gap-1 shrink-0" id="mob-nav"></div>
+
+<main class="flex-1 flex overflow-hidden relative">
+
+  <!-- ================= POS ================= -->
+  <section id="section-pos" class="flex-1 flex flex-col lg:flex-row w-full h-full overflow-hidden">
+    <div class="flex-1 flex flex-col p-3 sm:p-4 gap-3 bg-gray-50 dark:bg-navy-950 min-w-0 overflow-hidden min-h-[40%]">
+      <div class="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center">
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0" id="categories-container"></div>
+        <div class="relative min-w-[220px]">
+          <input type="text" id="search-input" oninput="handleSearch(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addByBarcode(this.value);}" placeholder="بحث أو قراءة باركود ثم Enter..." class="inp pr-9 shadow-sm">
+          <span class="absolute right-3 top-2.5 text-gray-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto pr-1">
+        <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3"></div>
+        <div id="no-products-msg" class="hidden text-center py-12 text-gray-400 text-sm">لم يتم العثور على صنف مطابق</div>
+      </div>
+    </div>
+
+    <aside class="w-full lg:w-[460px] bg-white dark:bg-navy-800 border-r border-gray-200 dark:border-gray-700/80 flex flex-col shadow-2xl z-10 shrink-0 overflow-y-auto lg:overflow-hidden">
+      <div class="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-navy-900/50">
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="font-bold text-xs text-gray-800 dark:text-gray-200">بيانات العميل والمركبة</h2>
+          <div class="flex items-center gap-2">
+            <span id="linked-job-tag" class="hidden text-[10px] bg-emerald-500/15 text-emerald-500 font-bold px-2 py-0.5 rounded-md"></span>
+            <button onclick="switchTab('workshop')" class="text-[11px] text-brandOrange-500 font-bold hover:underline">من قائمة الورشة</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="lbl">رقم اللوحة</label><input id="cart-plate" class="inp font-bold" placeholder="أ ب ج 1234"></div>
+          <div><label class="lbl">السيارة والموديل</label><input id="cart-model" class="inp" placeholder="تويوتا كامري 2023"></div>
+          <div><label class="lbl">عداد المسافة (كم)</label><input id="cart-odo" type="number" min="0" class="inp" placeholder="125000"></div>
+          <div><label class="lbl">جوال العميل</label><input id="cart-phone" type="tel" class="inp" dir="ltr" placeholder="05xxxxxxxx"></div>
+          <div class="col-span-2"><label class="lbl">الفني الافتراضي للبنود الجديدة</label><select id="cart-tech" class="inp"></select></div>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col p-3 overflow-hidden min-h-[160px]">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-bold text-xs text-gray-800 dark:text-gray-200">عناصر الفاتورة</h3>
+          <button onclick="clearCart()" class="text-[11px] text-red-500 font-bold">تفريغ السلة</button>
+        </div>
+        <div id="cart-items" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
+        <div id="cart-empty" class="flex-1 flex items-center justify-center text-gray-400 text-xs">لم يتم إضافة أي قطع أو خدمات بعد</div>
+      </div>
+
+      <div class="p-3 bg-gray-50 dark:bg-navy-900/90 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        <div class="space-y-1 text-xs">
+          <div class="flex justify-between items-center text-gray-500 dark:text-gray-400">
+            <span>الخصم:</span>
+            <div class="flex items-center gap-1">
+              <input type="number" id="discount-input" value="0" min="0" oninput="renderTotals()" class="w-20 inp !py-0.5 text-center font-bold">
+              <select id="discount-type" onchange="renderTotals()" class="inp !w-auto !py-0.5"><option value="amount">ر.س</option><option value="percent">%</option></select>
+            </div>
+          </div>
+          <div class="flex justify-between text-gray-500 dark:text-gray-400"><span>المجموع قبل الضريبة:</span><span id="t-sub" class="font-bold text-gray-800 dark:text-gray-200">0.00</span></div>
+          <div class="flex justify-between text-gray-500 dark:text-gray-400"><span>ضريبة القيمة المضافة:</span><span id="t-vat" class="font-bold text-brandOrange-500">0.00</span></div>
+          <div class="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
+          <div class="flex justify-between items-center font-black text-gray-900 dark:text-white"><span>الإجمالي شامل الضريبة:</span><span id="t-total" class="text-xl text-emerald-500">0.00 ر.س</span></div>
+        </div>
+
+        <div>
+          <label class="lbl">طريقة الدفع</label>
+          <div class="grid grid-cols-4 gap-1.5" id="payment-methods"></div>
+          <div id="split-box" class="hidden grid grid-cols-3 gap-1.5 mt-2">
+            <div><label class="lbl">نقدي</label><input id="pay-cash" type="number" min="0" step="0.01" oninput="onSplitInput('cash')" class="inp"></div>
+            <div><label class="lbl">شبكة</label><input id="pay-card" type="number" min="0" step="0.01" oninput="onSplitInput('card')" class="inp"></div>
+            <div><label class="lbl">تحويل</label><input id="pay-transfer" type="number" min="0" step="0.01" oninput="onSplitInput('transfer')" class="inp"></div>
+            <p id="split-msg" class="col-span-3 text-[10px] font-bold"></p>
+          </div>
+          <div id="cash-box" class="flex items-center gap-2 mt-2">
+            <label class="lbl !mb-0 whitespace-nowrap">المبلغ المستلم</label>
+            <input id="cash-received" type="number" min="0" step="0.01" oninput="renderChange()" class="inp !py-1">
+            <span id="cash-change" class="text-xs font-bold text-emerald-500 whitespace-nowrap"></span>
+          </div>
+        </div>
+
+        <button onclick="processInvoice()" id="btn-checkout" disabled class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 dark:disabled:bg-gray-700 text-white font-extrabold py-3 rounded-xl shadow-lg transition text-sm">
+          إصدار الفاتورة الإلكترونية
+        </button>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ================= WORKSHOP ================= -->
+  <section id="section-workshop" class="hidden flex-1 p-4 bg-gray-50 dark:bg-navy-950 overflow-y-auto w-full">
+    <div class="max-w-6xl mx-auto space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-white dark:bg-navy-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+        <div>
+          <h2 class="text-lg font-black">استقبال السيارات وأوامر العمل</h2>
+          <p class="text-xs text-gray-500 dark:text-gray-400">في الانتظار ← قيد التنفيذ ← مكتملة ← تمت الفوترة</p>
+        </div>
+        <button onclick="openJobModal()" class="bg-brandOrange-500 hover:bg-brandOrange-600 text-white font-bold px-4 py-2 rounded-xl text-xs">+ تسجيل سيارة جديدة</button>
+      </div>
+      <div class="flex gap-1.5 overflow-x-auto" id="job-filters"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="jobs-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================= INVENTORY ================= -->
+  <section id="section-inventory" class="hidden flex-1 p-4 bg-gray-50 dark:bg-navy-950 overflow-y-auto w-full">
+    <div class="max-w-6xl mx-auto space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-white dark:bg-navy-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+        <div>
+          <h2 class="text-lg font-black">إدارة المخزون</h2>
+          <p class="text-xs text-gray-500 dark:text-gray-400">الأصناف والأسعار والتكلفة والعمولات وتنبيهات النقص</p>
+        </div>
+        <button onclick="openProductModal()" data-admin class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs">+ إضافة صنف</button>
+      </div>
+      <div class="bg-white dark:bg-navy-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs">
+            <thead class="bg-gray-100 dark:bg-navy-900 text-gray-600 dark:text-gray-300 font-bold">
+              <tr><th class="p-3">الكود</th><th class="p-3">الباركود</th><th class="p-3">الصنف</th><th class="p-3">القسم</th><th class="p-3">السعر</th><th class="p-3" data-admin>التكلفة</th><th class="p-3">العمولة</th><th class="p-3">المخزون</th><th class="p-3">الحالة</th><th class="p-3 text-center">إجراءات</th></tr>
+            </thead>
+            <tbody id="inventory-tbody" class="divide-y divide-gray-100 dark:divide-gray-700/50"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TECHNICIANS ================= -->
+  <section id="section-technicians" class="hidden flex-1 p-4 bg-gray-50 dark:bg-navy-950 overflow-y-auto w-full">
+    <div class="max-w-6xl mx-auto space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-white dark:bg-navy-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+        <div>
+          <h2 class="text-lg font-black">عمولات الفنيين</h2>
+          <p class="text-xs text-gray-500 dark:text-gray-400">محسوبة من بنود الفواتير الصادرة (العمولة لكل بند)</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="comm-period" onchange="loadCommissions()" class="inp !w-auto">
+            <option value="today">اليوم</option><option value="month" selected>هذا الشهر</option><option value="prev">الشهر الماضي</option>
+          </select>
+          <button onclick="openTechModal()" data-admin class="bg-brandOrange-500 hover:bg-brandOrange-600 text-white font-bold px-3 py-2 rounded-xl text-xs whitespace-nowrap">+ فني</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="tech-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================= REPORTS ================= -->
+  <section id="section-reports" class="hidden flex-1 p-4 bg-gray-50 dark:bg-navy-950 overflow-y-auto w-full">
+    <div class="max-w-6xl mx-auto space-y-4">
+      <div class="bg-gradient-to-r from-navy-800 to-navy-950 border border-brandOrange-500/30 p-5 rounded-2xl text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <span class="text-xs bg-brandOrange-500 font-bold px-2.5 py-1 rounded-md mb-2 inline-block" id="rep-shift-tag">—</span>
+          <h2 class="text-xl font-black">الوردية الحالية وإغلاق الدرج</h2>
+          <p class="text-xs text-gray-300 mt-1" id="rep-shift-info">—</p>
+        </div>
+        <button onclick="onShiftBadge()" id="rep-shift-btn" class="bg-brandOrange-500 hover:bg-brandOrange-600 font-extrabold px-5 py-2.5 rounded-xl text-xs">—</button>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="rep-stats"></div>
+      <div class="bg-white dark:bg-navy-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
+        <h3 class="font-bold text-sm mb-3">فواتير الوردية الحالية</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs">
+            <thead class="bg-gray-100 dark:bg-navy-900 text-gray-600 dark:text-gray-300 font-bold">
+              <tr><th class="p-2.5">رقم الفاتورة</th><th class="p-2.5">الوقت</th><th class="p-2.5">المركبة</th><th class="p-2.5">الدفع</th><th class="p-2.5">الإجمالي</th><th class="p-2.5 text-center">طباعة</th></tr>
+            </thead>
+            <tbody id="rep-invoices" class="divide-y divide-gray-100 dark:divide-gray-700/50"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===================== MODALS ===================== -->
+<div id="modal-receipt" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl max-w-sm w-full p-4 text-gray-900 shadow-2xl my-auto">
+    <div id="receipt-print-area" class="text-center">
+      <div class="border-b border-dashed border-gray-400 pb-3 mb-3">
+        <h2 class="font-black text-base" id="rec-store">—</h2>
+        <p class="text-[10px] text-gray-600" id="rec-address"></p>
+        <p class="text-[10px] text-gray-600">س.ت: <span id="rec-cr"></span></p>
+        <p class="text-[10px] text-gray-600 font-mono">الرقم الضريبي: <span id="rec-vat"></span></p>
+      </div>
+      <div class="text-right text-[11px] space-y-1 mb-3 border-b border-dashed border-gray-400 pb-2">
+        <div class="font-black text-center text-xs mb-1">فاتورة ضريبية مبسطة</div>
+        <div class="flex justify-between"><span>رقم الفاتورة:</span><span class="font-mono font-bold" id="rec-no"></span></div>
+        <div class="flex justify-between"><span>التاريخ والوقت:</span><span id="rec-date"></span></div>
+        <div class="flex justify-between"><span>طريقة الدفع:</span><span id="rec-pay" class="font-bold"></span></div>
+      </div>
+      <div class="bg-gray-100 p-2 rounded text-right text-[10px] space-y-1 mb-3 border border-gray-300" id="rec-vehicle"></div>
+      <table class="w-full text-right text-[10px] mb-3">
+        <thead><tr class="border-b border-black font-bold"><th class="py-1">الصنف</th><th class="text-center py-1">الكمية</th><th class="text-left py-1">المبلغ</th></tr></thead>
+        <tbody id="rec-items"></tbody>
+      </table>
+      <div class="border-t border-dashed border-gray-400 pt-2 text-[10px] space-y-1 text-right mb-3">
+        <div class="flex justify-between"><span>الإجمالي قبل الخصم:</span><span id="rec-gross"></span></div>
+        <div class="flex justify-between"><span>الخصم:</span><span id="rec-discount"></span></div>
+        <div class="flex justify-between"><span>المجموع غير شامل الضريبة:</span><span id="rec-sub"></span></div>
+        <div class="flex justify-between"><span>ضريبة القيمة المضافة (15%):</span><span id="rec-vat-total"></span></div>
+        <div class="flex justify-between font-extrabold text-xs border-t border-black pt-1"><span>الإجمالي شامل الضريبة:</span><span id="rec-total"></span></div>
+      </div>
+      <div class="flex flex-col items-center my-2">
+        <div id="rec-qr" class="p-1.5 bg-white border border-gray-300 rounded inline-block"></div>
+        <span class="text-[8px] text-gray-500 mt-1">شكراً لزيارتكم</span>
+      </div>
+    </div>
+    <div class="mt-4 flex gap-2">
+      <button onclick="window.print()" class="flex-1 bg-brandOrange-500 hover:bg-brandOrange-600 text-white py-2 rounded-xl text-xs font-bold">طباعة</button>
+      <button onclick="closeModal('modal-receipt')" class="px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-xl text-xs font-bold">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-job" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-5 shadow-2xl">
+    <h3 class="font-black text-base mb-3">تسجيل سيارة جديدة</h3>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="lbl">رقم اللوحة *</label><input id="job-plate" class="inp font-bold"></div>
+      <div><label class="lbl">السيارة والموديل</label><input id="job-model" class="inp"></div>
+      <div><label class="lbl">عداد المسافة</label><input id="job-odo" type="number" min="0" class="inp"></div>
+      <div><label class="lbl">جوال العميل</label><input id="job-phone" type="tel" dir="ltr" class="inp"></div>
+      <div class="col-span-2"><label class="lbl">الخدمة المطلوبة</label><input id="job-service" class="inp" placeholder="تغيير زيت + ترصيص"></div>
+      <div class="col-span-2"><label class="lbl">الفني</label><select id="job-tech" class="inp"></select></div>
+    </div>
+    <div class="mt-5 flex gap-2">
+      <button onclick="saveJob()" class="flex-1 bg-brandOrange-500 hover:bg-brandOrange-600 text-white font-bold py-2.5 rounded-xl text-xs">حفظ</button>
+      <button onclick="closeModal('modal-job')" class="px-4 bg-gray-200 dark:bg-navy-700 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-product" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-5 shadow-2xl">
+    <h3 class="font-black text-base mb-3" id="prod-modal-title">صنف</h3>
+    <input type="hidden" id="prod-id">
+    <div class="grid grid-cols-2 gap-3">
+      <div class="col-span-2"><label class="lbl">اسم الصنف أو الخدمة *</label><input id="prod-name" class="inp font-bold"></div>
+      <div><label class="lbl">الكود *</label><input id="prod-code" class="inp font-mono" dir="ltr"></div>
+      <div><label class="lbl">الباركود</label><input id="prod-barcode" class="inp font-mono" dir="ltr"></div>
+      <div><label class="lbl">القسم</label><select id="prod-category" class="inp"></select></div>
+      <div><label class="lbl">السعر شامل الضريبة *</label><input id="prod-price" type="number" min="0" step="0.01" class="inp"></div>
+      <div><label class="lbl">التكلفة</label><input id="prod-cost" type="number" min="0" step="0.01" class="inp"></div>
+      <div><label class="lbl">عمولة الفني لكل وحدة (ر.س)</label><input id="prod-comm" type="number" min="0" step="0.01" class="inp"></div>
+      <div><label class="lbl">الكمية بالمخزن</label><input id="prod-stock" type="number" min="0" class="inp"></div>
+      <div><label class="lbl">حد التنبيه</label><input id="prod-min" type="number" min="0" class="inp"></div>
+      <label class="col-span-2 flex items-center gap-2 text-xs"><input type="checkbox" id="prod-active" checked> صنف فعّال (يظهر في الكاشير)</label>
+    </div>
+    <div class="mt-5 flex gap-2">
+      <button onclick="saveProduct()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs">حفظ</button>
+      <button onclick="closeModal('modal-product')" class="px-4 bg-gray-200 dark:bg-navy-700 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-tech" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+    <h3 class="font-black text-base mb-3">إضافة فني</h3>
+    <div class="space-y-3">
+      <div><label class="lbl">الاسم *</label><input id="tech-name" class="inp"></div>
+      <div><label class="lbl">التخصص</label><input id="tech-spec" class="inp"></div>
+    </div>
+    <div class="mt-5 flex gap-2">
+      <button onclick="saveTech()" class="flex-1 bg-brandOrange-500 text-white font-bold py-2.5 rounded-xl text-xs">حفظ</button>
+      <button onclick="closeModal('modal-tech')" class="px-4 bg-gray-200 dark:bg-navy-700 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-open-shift" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+    <h3 class="font-black text-base mb-1">فتح وردية جديدة</h3>
+    <p class="text-xs text-gray-400 mb-3">أدخل المبلغ النقدي الموجود في الدرج عند البداية</p>
+    <label class="lbl">رصيد الدرج الافتتاحي (ر.س)</label>
+    <input id="open-cash" type="number" min="0" step="0.01" value="0" class="inp">
+    <div class="mt-5 flex gap-2">
+      <button onclick="openShift()" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs">فتح الوردية</button>
+      <button onclick="closeModal('modal-open-shift')" class="px-4 bg-gray-200 dark:bg-navy-700 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-close-shift" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-5 shadow-2xl my-auto">
+    <h3 class="font-black text-base mb-1">إغلاق الوردية ومطابقة الدرج</h3>
+    <p class="text-xs text-gray-400 mb-3">عدّ المبالغ الفعلية وأدخلها، والنظام يقارنها بالمسجل</p>
+    <div class="grid grid-cols-3 gap-2 text-xs mb-3">
+      <div><label class="lbl">النقد في الدرج</label><input id="cnt-cash" type="number" step="0.01" min="0" oninput="renderShiftDiff()" class="inp"></div>
+      <div><label class="lbl">إيصالات الشبكة</label><input id="cnt-card" type="number" step="0.01" min="0" oninput="renderShiftDiff()" class="inp"></div>
+      <div><label class="lbl">التحويلات</label><input id="cnt-transfer" type="number" step="0.01" min="0" oninput="renderShiftDiff()" class="inp"></div>
+    </div>
+    <div id="shift-diff" class="text-xs space-y-1 bg-gray-50 dark:bg-navy-900 p-3 rounded-xl"></div>
+    <label class="lbl mt-3">ملاحظات</label><input id="cnt-notes" class="inp">
+    <div class="mt-5 flex gap-2">
+      <button onclick="closeShift()" class="flex-1 bg-brandOrange-500 text-white font-bold py-2.5 rounded-xl text-xs">إغلاق الوردية وطباعة التقرير</button>
+      <button onclick="closeModal('modal-close-shift')" class="px-4 bg-gray-200 dark:bg-navy-700 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-settings" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-5 shadow-2xl">
+    <h3 class="font-black text-base mb-1">إعدادات المنشأة</h3>
+    <p class="text-xs text-gray-400 mb-3">تظهر على الفاتورة وفي رمز QR</p>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="col-span-2"><label class="lbl">اسم المنشأة (كما في السجل) *</label><input id="set-name" class="inp"></div>
+      <div><label class="lbl">رقم السجل التجاري *</label><input id="set-cr" class="inp font-mono" dir="ltr"></div>
+      <div><label class="lbl">الرقم الضريبي (15 رقم) *</label><input id="set-vat" class="inp font-mono" dir="ltr" maxlength="15"></div>
+      <div class="col-span-2"><label class="lbl">العنوان</label><input id="set-address" class="inp"></div>
+      <div><label class="lbl">الهاتف</label><input id="set-phone" class="inp" dir="ltr"></div>
+      <div><label class="lbl">بادئة رقم الفاتورة</label><input id="set-prefix" class="inp font-mono" dir="ltr"></div>
+    </div>
+    <div class="mt-5 flex gap-2">
+      <button onclick="saveSettings()" class="flex-1 bg-brandOrange-500 text-white font-bold py-2.5 rounded-xl text-xs">حفظ</button>
+      <button onclick="closeModal('modal-settings')" class="px-4 bg-gray-200 dark:bg-navy-700 rounded-xl text-xs font-bold">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-staff" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-2xl w-full p-5 shadow-2xl my-auto">
+    <div class="flex justify-between items-start mb-3">
+      <div>
+        <h3 class="font-black text-base">الموظفون والصلاحيات</h3>
+        <p class="text-xs text-gray-400">الموظف ينشئ حسابه من شاشة الدخول، ثم تفعّله هنا وتحدد دوره</p>
+      </div>
+      <button onclick="closeModal('modal-staff')" class="text-gray-400 hover:text-red-500 text-xl leading-none">×</button>
+    </div>
+    <div id="staff-list" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+  </div>
+</div>
+
+<div id="toasts"class="fixed bottom-4 left-4 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
+<script>
+/* =========================================================================
+   الإعدادات — روابط مشروع Neon (CARE)
+   ========================================================================= */
+const AUTH_URL = 'https://ep-weathered-dust-b43qq13m.neonauth.c-6.us-east-2.aws.neon.tech/neondb/auth';
+const API_URL  = 'https://ep-weathered-dust-b43qq13m.apirest.c-6.us-east-2.aws.neon.tech/neondb/rest/v1';
+const VAT_RATE = 0.15;
+
+/* =========================================================================
+   الشعار
+   ========================================================================= */
+const LOGO_SVG = `<svg class="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M100 15 C60 15 30 45 30 85 C30 135 100 185 100 185 C100 185 170 135 170 85 C170 45 140 15 100 15 Z" fill="#0B192C" stroke="#1E3E62" stroke-width="6"/>
+  <path d="M45 125 C60 160 100 175 100 175 C100 175 140 160 155 125 C140 145 100 155 100 155 C100 155 60 145 45 125 Z" fill="#FF6500"/>
+  <path d="M35 110 C45 140 75 160 100 165 C70 150 50 130 35 110 Z" fill="#FF8A00"/>
+  <path d="M165 110 C155 140 125 160 100 165 C130 150 150 130 165 110 Z" fill="#FF8A00"/>
+  <circle cx="95" cy="75" r="40" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-dasharray="12 6"/>
+  <path d="M125 40 L150 65 L140 75 L115 50 Z" fill="#FF8A00"/>
+  <circle cx="145" cy="45" r="8" fill="#0B192C" stroke="#FF8A00" stroke-width="3"/>
+  <path d="M70 85 C75 72 85 70 95 70 C108 70 115 72 120 85 L130 87 C133 87 135 89 135 92 L133 97 C133 99 130 100 125 100 L65 100 C60 100 57 99 57 97 L55 92 C55 89 57 87 60 87 Z" fill="#FF8A00"/>
+  <circle cx="75" cy="97" r="5" fill="#FFFFFF"/><circle cx="115" cy="97" r="5" fill="#FFFFFF"/></svg>`;
+document.getElementById('login-logo').innerHTML = LOGO_SVG;
+document.getElementById('header-logo').innerHTML = LOGO_SVG;
+
+/* =========================================================================
+   أدوات عامة
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const money = n => Number(n || 0).toFixed(2);
+const PAY_NAMES = { cash: 'نقدي', card: 'شبكة (مدى/فيزا)', transfer: 'تحويل بنكي', split: 'دفع متعدد' };
+const STATUS = {
+  waiting:     { name: 'في الانتظار',  cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400', next: 'in_progress', nextLbl: 'بدء التنفيذ' },
+  in_progress: { name: 'قيد التنفيذ',  cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',     next: 'completed',   nextLbl: 'تم الإنجاز' },
+  completed:   { name: 'مكتملة',       cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' },
+  invoiced:    { name: 'تمت الفوترة',  cls: 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
+  cancelled:   { name: 'ملغاة',        cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' }
+};
+
+function showToast(msg, type = 'info') {
+  const bg = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : type === 'warning' ? 'bg-amber-500' : 'bg-brandOrange-500';
+  const t = document.createElement('div');
+  t.className = `${bg} text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-extrabold transition-all duration-300 opacity-0 translate-y-2 max-w-xs`;
+  t.textContent = msg;
+  $('toasts').appendChild(t);
+  requestAnimationFrame(() => t.classList.remove('opacity-0', 'translate-y-2'));
+  setTimeout(() => { t.classList.add('opacity-0'); setTimeout(() => t.remove(), 300); }, type === 'error' ? 5000 : 3000);
+}
+function openModal(id) { $(id).classList.remove('hidden'); $(id).classList.add('flex'); }
+function closeModal(id) { $(id).classList.add('hidden'); $(id).classList.remove('flex'); }
+function setLoading(on, text) { $('loading-screen').classList.toggle('hidden', !on); if (text) $('loading-text').textContent = text; }
+function toggleDarkMode() {
+  document.documentElement.classList.toggle('dark');
+  try { localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light'); } catch (e) {}
+}
+try { if (localStorage.getItem('theme') === 'light') document.documentElement.classList.remove('dark'); } catch (e) {}
+
+/* =========================================================================
+   تسجيل الدخول — Neon Auth
+   - نرسل الكوكيز (credentials: include) ونحتفظ برمز الجلسة كـ Bearer أيضاً،
+     لأن بعض المتصفحات (Safari) تحجب كوكيز المواقع الأخرى.
+   - رمز JWT يُطلب من /token ويُجدد تلقائياً قبل انتهائه (15 دقيقة).
+   ========================================================================= */
+const Auth = {
+  jwt: null, jwtExp: 0, user: null,
+  get sessionToken() { try { return localStorage.getItem('care_session') || ''; } catch (e) { return ''; } },
+  set sessionToken(v) { try { v ? localStorage.setItem('care_session', v) : localStorage.removeItem('care_session'); } catch (e) {} },
+
+  async req(path, opts = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (this.sessionToken) headers['Authorization'] = 'Bearer ' + this.sessionToken;
+    return fetch(AUTH_URL + path, { ...opts, headers, credentials: 'include' });
+  },
+
+  async signIn(email, password) {
+    const res = await this.req('/sign-in/email', { method: 'POST', body: JSON.stringify({ email, password, rememberMe: true }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const m = body?.message || body?.error?.message || '';
+      throw new Error(/invalid|incorrect|password|credential/i.test(m) ? 'البريد أو كلمة المرور غير صحيحة' : (m || 'تعذر تسجيل الدخول'));
+    }
+    const tok = res.headers.get('set-auth-token') || body?.token || body?.session?.token;
+    if (tok) this.sessionToken = tok;
+    this.jwt = null;
+    return body?.user;
+  },
+
+  decode(jwt) {
+    try { return JSON.parse(decodeURIComponent(escape(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); }
+    catch (e) { return null; }
+  },
+
+  async getJwt(force = false) {
+    if (!force && this.jwt && Date.now() < this.jwtExp - 60000) return this.jwt;
+    let token = null;
+    try {
+      const res = await this.req('/token', { method: 'GET' });
+      if (res.ok) token = (await res.json().catch(() => ({})))?.token || null;
+    } catch (e) {}
+    if (!token) {
+      try {
+        const res = await this.req('/get-session', { method: 'GET' });
+        if (res.ok) token = res.headers.get('set-auth-jwt');
+      } catch (e) {}
+    }
+    if (!token) { this.jwt = null; return null; }
+    const p = this.decode(token);
+    this.jwt = token; this.jwtExp = (p?.exp || 0) * 1000; this.user = p;
+    return token;
+  },
+
+  async signOut() {
+    try { await this.req('/sign-out', { method: 'POST', body: '{}' }); } catch (e) {}
+    this.sessionToken = ''; this.jwt = null; this.user = null;
+  },
+
+  async post(path, body) {
+    const res = await this.req(path, { method: 'POST', body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data, res };
+  },
+
+  async signUp(name, email, password) {
+    const r = await this.post('/sign-up/email', { name, email, password });
+    if (!r.ok) {
+      const m = r.data?.message || '';
+      throw new Error(/exist/i.test(m) ? 'هذا البريد مسجل مسبقاً — استخدم "نسيت كلمة المرور"' : /password/i.test(m) ? 'كلمة المرور ضعيفة (8 أحرف على الأقل)' : (m || 'تعذر إنشاء الحساب'));
+    }
+    const tok = r.res.headers.get('set-auth-token') || r.data?.token;
+    if (tok) this.sessionToken = tok;
+  },
+
+  // يرسل رمزاً للبريد لتعيين كلمة مرور جديدة. يرجع 'otp' أو 'link' حسب ما يدعمه الخادم.
+  async requestReset(email) {
+    let r = await this.post('/email-otp/send-verification-otp', { email, type: 'forget-password' });
+    if (r.ok) return 'otp';
+    if (r.status === 404) {
+      r = await this.post('/request-password-reset', { email, redirectTo: location.origin + location.pathname + '?reset=1' });
+      if (r.ok) return 'link';
+    }
+    throw new Error(r.data?.message || 'تعذر إرسال الرمز');
+  },
+
+  async resetWithOtp(email, otp, password) {
+    const r = await this.post('/email-otp/reset-password', { email, otp, password });
+    if (!r.ok) throw new Error(/otp|code|invalid/i.test(r.data?.message || '') ? 'الرمز غير صحيح أو منتهي' : (r.data?.message || 'تعذر تعيين كلمة المرور'));
+  },
+
+  async resetWithToken(token, newPassword) {
+    const r = await this.post('/reset-password', { token, newPassword });
+    if (!r.ok) throw new Error(r.data?.message || 'الرابط غير صالح أو منتهي');
+  }
+};
+
+/* =========================================================================
+   Neon Data API (PostgREST)
+   ========================================================================= */
+async function api(path, { method = 'GET', body, prefer, retry = true } = {}) {
+  const jwt = await Auth.getJwt();
+  if (!jwt) { forceLogin('انتهت الجلسة، سجّل الدخول مرة أخرى'); throw new Error('no session'); }
+  const headers = { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' };
+  if (prefer) headers['Prefer'] = prefer;
+  const res = await fetch(API_URL + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+  if (res.status === 401 && retry) { await Auth.getJwt(true); return api(path, { method, body, prefer, retry: false }); }
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    let m = data?.message || 'خطأ غير متوقع';
+    if (/duplicate key.*code/i.test(m)) m = 'الكود مستخدم لصنف آخر';
+    else if (/duplicate key.*barcode/i.test(m)) m = 'الباركود مستخدم لصنف آخر';
+    else if (/vat_number_check/i.test(m)) m = 'الرقم الضريبي يجب أن يكون 15 رقماً يبدأ وينتهي بـ 3';
+    else if (/permission denied|row-level security/i.test(m)) m = 'ليس لديك صلاحية لهذا الإجراء';
+    else if (/one_open_shift/i.test(m)) m = 'توجد وردية مفتوحة بالفعل';
+    throw new Error(m);
+  }
+  return data;
+}
+const rpc = (fn, args) => api('/rpc/' + fn, { method: 'POST', body: args });
+
+/* =========================================================================
+   الحالة
+   ========================================================================= */
+const S = {
+  role: null, me: null, settings: null, categories: [], technicians: [], products: [],
+  jobs: [], shift: null, cart: [], currentCategory: 'all', search: '', payMethod: 'cash',
+  linkedJobId: null, jobFilter: 'active', tab: 'pos', shiftSummary: null
+};
+const isAdmin = () => S.role === 'admin';
+
+/* =========================================================================
+   الدخول والتهيئة
+   ========================================================================= */
+/* شاشة الدخول: signin | signup | forgot | reset (رمز) | newpass (رابط) */
+const AUTH_MODES = {
+  signin:  { title: 'تسجيل الدخول',            btn: 'دخول',                 pass: 'كلمة المرور',
+             a: ['نسيت كلمة المرور / تعيينها', 'forgot'], b: ['موظف جديد؟ أنشئ حساباً', 'signup'] },
+  signup:  { title: 'إنشاء حساب موظف',          btn: 'إنشاء الحساب',         pass: 'كلمة المرور (8 أحرف على الأقل)',
+             a: ['لدي حساب', 'signin'] },
+  forgot:  { title: 'تعيين كلمة مرور',          btn: 'أرسل الرمز لبريدي',
+             a: ['رجوع للدخول', 'signin'] },
+  reset:   { title: 'أدخل الرمز وكلمة المرور الجديدة', btn: 'حفظ كلمة المرور', pass: 'كلمة المرور الجديدة',
+             a: ['إعادة إرسال الرمز', 'forgot'], b: ['رجوع للدخول', 'signin'] },
+  newpass: { title: 'كلمة مرور جديدة',          btn: 'حفظ كلمة المرور',      pass: 'كلمة المرور الجديدة',
+             a: ['رجوع للدخول', 'signin'] }
+};
+let authMode = 'signin';
+function setAuthMode(m, info) {
+  authMode = m; const c = AUTH_MODES[m];
+  $('auth-title').textContent = c.title; $('login-btn').textContent = c.btn;
+  if (c.pass) $('pass-label').textContent = c.pass;
+  $('login-pass').autocomplete = m === 'signin' ? 'current-password' : 'new-password';
+  document.querySelectorAll('#login-form [data-mode]').forEach(el => el.classList.toggle('hidden', !el.dataset.mode.split(' ').includes(m)));
+  [['link-a', c.a], ['link-b', c.b]].forEach(([id, l]) => { $(id).classList.toggle('invisible', !l); if (l) { $(id).textContent = l[0]; $(id).onclick = () => setAuthMode(l[1]); } });
+  $('login-error').classList.add('hidden');
+  $('login-info').classList.toggle('hidden', !info); if (info) $('login-info').textContent = info;
+}
+
+async function submitAuth() {
+  const btn = $('login-btn'), err = $('login-error');
+  const email = $('login-email').value.trim(), pass = $('login-pass').value;
+  const need = (cond, msg) => { if (!cond) throw new Error(msg); };
+  err.classList.add('hidden'); btn.disabled = true; const label = btn.textContent; btn.textContent = 'لحظة...';
+  try {
+    if (authMode === 'signin') {
+      need(email && pass, 'أدخل البريد وكلمة المرور');
+      await Auth.signIn(email, pass); await afterAuth();
+    } else if (authMode === 'signup') {
+      const name = $('login-name').value.trim();
+      need(name && email, 'أدخل الاسم والبريد'); need(pass.length >= 8, 'كلمة المرور 8 أحرف على الأقل');
+      await Auth.signUp(name, email, pass); await afterAuth();
+    } else if (authMode === 'forgot') {
+      need(email, 'أدخل بريدك الإلكتروني');
+      const kind = await Auth.requestReset(email);
+      if (kind === 'otp') setAuthMode('reset', 'أرسلنا رمزاً إلى ' + email + ' (تحقق من البريد المزعج أيضاً)');
+      else setAuthMode('signin', 'أرسلنا رابطاً إلى بريدك، افتحه من هذا الجهاز لتعيين كلمة المرور');
+    } else if (authMode === 'reset') {
+      const otp = $('login-otp').value.trim();
+      need(otp, 'أدخل الرمز'); need(pass.length >= 8, 'كلمة المرور 8 أحرف على الأقل');
+      await Auth.resetWithOtp(email, otp, pass);
+      await Auth.signIn(email, pass); await afterAuth();
+    } else if (authMode === 'newpass') {
+      need(pass.length >= 8, 'كلمة المرور 8 أحرف على الأقل');
+      await Auth.resetWithToken(new URLSearchParams(location.search).get('token'), pass);
+      history.replaceState(null, '', location.pathname);
+      setAuthMode('signin', 'تم حفظ كلمة المرور، سجّل الدخول الآن');
+    }
+  } catch (e) {
+    err.textContent = e.message; err.classList.remove('hidden');
+  } finally { btn.disabled = false; if (btn.textContent === 'لحظة...') btn.textContent = label; }
+}
+
+async function afterAuth() {
+  const jwt = await Auth.getJwt(true);
+  if (!jwt) throw new Error('تم التحقق من الحساب لكن المتصفح منع الجلسة. تأكد أن رابط الموقع مضاف في Neon Auth كنطاق موثوق.');
+  $('login-pass').value = ''; $('login-otp').value = '';
+  await bootstrap();
+}
+
+async function doLogout() {
+  await Auth.signOut();
+  S.cart = []; S.linkedJobId = null;
+  $('login-screen').classList.remove('hidden');
+}
+
+function forceLogin(msg) {
+  $('login-screen').classList.remove('hidden');
+  if (msg) { $('login-error').textContent = msg; $('login-error').classList.remove('hidden'); }
+}
+
+async function bootstrap() {
+  setLoading(true, 'جاري تحميل البيانات...');
+  try {
+    const role = await rpc('current_app_role', {});
+    S.role = typeof role === 'string' ? role : null;
+    if (!S.role) {
+      setLoading(false);
+      forceLogin('حسابك غير مفعّل في النظام. اطلب من المدير إضافتك كموظف.');
+      return;
+    }
+    const uid = Auth.user?.sub;
+    const [me, cats, techs] = await Promise.all([
+      api(`/app_users?user_id=eq.${encodeURIComponent(uid)}&select=full_name,role`),
+      api('/categories?select=*&order=sort_order'),
+      api('/technicians?select=*&is_active=eq.true&order=id'),
+      loadSettings()
+    ]);
+    S.me = me[0]; S.categories = cats; S.technicians = techs;
+    await Promise.all([loadProducts(), loadJobs(), loadShift()]);
+    applyUser(); renderNav(); renderCategories(); renderTechSelects(); renderPaymentButtons();
+    renderProducts(); renderCart(); renderJobs(); renderInventory();
+    $('login-screen').classList.add('hidden');
+  } catch (e) {
+    if (e.message !== 'no session') showToast('تعذر تحميل البيانات: ' + e.message, 'error');
+  } finally { setLoading(false); }
+}
+
+async function loadSettings() {
+  let s = await rpc('get_store_settings', {});
+  if (Array.isArray(s)) s = s[0];
+  if (!s || !s.store_name) throw new Error('تعذر قراءة إعدادات المنشأة');
+  S.settings = s;
+}
+
+function applyUser() {
+  const s = S.settings || {};
+  $('header-cr').textContent = s.cr_number || '—';
+  $('header-vat').textContent = s.vat_number || '—';
+  $('user-name').textContent = S.me?.full_name || Auth.user?.name || '';
+  $('user-role').textContent = isAdmin() ? 'مدير النظام' : 'كاشير';
+  $('user-avatar').textContent = (S.me?.full_name || '؟').charAt(0);
+  $('btn-settings').classList.toggle('hidden', !isAdmin());
+  $('btn-staff').classList.toggle('hidden', !isAdmin());
+  loadStaffPending();
+  document.querySelectorAll('[data-admin]').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+}
+
+/* =========================================================================
+   التنقل
+   ========================================================================= */
+const TABS = [
+  { id: 'pos', name: 'الكاشير والفوترة' }, { id: 'workshop', name: 'الورشة' },
+  { id: 'inventory', name: 'المخزون' }, { id: 'technicians', name: 'عمولات الفنيين' },
+  { id: 'reports', name: 'الوردية والتقارير' }
+];
+function renderNav() {
+  const low = S.products.filter(p => !isService(p) && p.is_active && p.stock <= p.min_stock).length;
+  const badge = id => id === 'inventory' && low ? `<span class="bg-red-500 text-white text-[10px] px-1.5 rounded-full">${low}</span>` : '';
+  $('desk-nav').innerHTML = TABS.map(t => `<button onclick="switchTab('${t.id}')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${S.tab === t.id ? 'bg-brandOrange-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-navy-800'}">${t.name}${badge(t.id)}</button>`).join('');
+  $('mob-nav').innerHTML = TABS.map(t => `<button onclick="switchTab('${t.id}')" class="px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 ${S.tab === t.id ? 'bg-brandOrange-500 text-white' : 'text-gray-600 dark:text-gray-300'}">${t.name}${badge(t.id)}</button>`).join('');
+}
+function switchTab(id) {
+  S.tab = id;
+  TABS.forEach(t => $('section-' + t.id).classList.toggle('hidden', t.id !== id));
+  renderNav();
+  if (id === 'workshop') loadJobs().then(renderJobs);
+  if (id === 'inventory') loadProducts().then(renderInventory);
+  if (id === 'technicians') loadCommissions();
+  if (id === 'reports') loadReports();
+}
+
+/* =========================================================================
+   الأصناف
+   ========================================================================= */
+const catById = id => S.categories.find(c => c.id === id);
+const isService = p => !!catById(p.category_id)?.is_service;
+
+async function loadProducts() { S.products = await api('/products?select=*&order=category_id,id'); }
+
+function renderCategories() {
+  const cats = [{ id: 'all', name_ar: 'الكل' }, ...S.categories];
+  $('categories-container').innerHTML = cats.map(c => `<button onclick="S.currentCategory='${c.id}';renderCategories();renderProducts();" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition border ${S.currentCategory === c.id ? 'bg-brandOrange-500 text-white border-brandOrange-500' : 'bg-white dark:bg-navy-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'}">${esc(c.name_ar)}</button>`).join('');
+}
+function handleSearch(v) { S.search = v; renderProducts(); }
+
+function renderProducts() {
+  const q = S.search.trim().toLowerCase();
+  const list = S.products.filter(p => p.is_active
+    && (S.currentCategory === 'all' || p.category_id === S.currentCategory)
+    && (!q || p.name_ar.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.barcode || '').includes(q)));
+  $('no-products-msg').classList.toggle('hidden', list.length > 0);
+  $('products-grid').innerHTML = list.map(p => {
+    const srv = isService(p), low = !srv && p.stock <= p.min_stock, out = !srv && p.stock <= 0;
+    return `<div onclick="addToCart(${p.id})" class="group bg-white dark:bg-navy-800 rounded-2xl p-3 border border-gray-200 dark:border-gray-700/80 hover:border-brandOrange-500 shadow-sm hover:shadow-xl transition cursor-pointer flex flex-col justify-between relative overflow-hidden ${out ? 'opacity-50' : ''}">
+      ${low ? `<span class="absolute top-0 left-0 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-br-lg">${out ? 'نفد' : 'نقص مخزون'}</span>` : ''}
+      <div>
+        <div class="flex justify-between text-[10px] text-gray-400 mb-1"><span class="font-mono">${esc(p.code)}</span><span class="${low ? 'text-red-500 font-extrabold' : ''}">${srv ? 'خدمة' : 'المخزون: ' + p.stock}</span></div>
+        <h4 class="font-bold text-xs group-hover:text-brandOrange-500 transition line-clamp-2 mb-2">${esc(p.name_ar)}</h4>
+      </div>
+      <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+        <div><span class="text-sm font-black">${money(p.price)}</span> <span class="text-[9px] text-gray-400">ر.س</span></div>
+        <span class="w-7 h-7 rounded-lg bg-orange-50 dark:bg-navy-900 text-brandOrange-500 group-hover:bg-brandOrange-500 group-hover:text-white flex items-center justify-center font-black">+</span>
+      </div></div>`;
+  }).join('');
+}
+
+function addByBarcode(v) {
+  const q = v.trim(); if (!q) return;
+  const p = S.products.find(x => x.is_active && (x.barcode === q || x.code.toLowerCase() === q.toLowerCase()));
+  if (p) { addToCart(p.id); $('search-input').value = ''; S.search = ''; renderProducts(); }
+  else showToast('لا يوجد صنف بهذا الباركود', 'warning');
+}
+
+/* =========================================================================
+   السلة
+   ========================================================================= */
+function renderTechSelects() {
+  const opts = S.technicians.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  $('cart-tech').innerHTML = `<option value="">بدون فني</option>` + opts;
+  $('job-tech').innerHTML = `<option value="">— غير محدد —</option>` + opts;
+}
+
+function addToCart(id) {
+  const p = S.products.find(x => x.id === id); if (!p) return;
+  const line = S.cart.find(i => i.product_id === id);
+  const srv = isService(p);
+  if (!srv && (line ? line.qty : 0) >= p.stock) { showToast('المخزون المتاح لا يكفي', 'warning'); return; }
+  if (line) line.qty++;
+  else S.cart.push({ product_id: id, qty: 1, technician_id: $('cart-tech').value ? Number($('cart-tech').value) : null });
+  renderCart();
+}
+function changeQty(id, d) {
+  const line = S.cart.find(i => i.product_id === id); const p = S.products.find(x => x.id === id);
+  if (d > 0 && !isService(p) && line.qty >= p.stock) { showToast('المخزون المتاح لا يكفي', 'warning'); return; }
+  line.qty += d; if (line.qty <= 0) S.cart = S.cart.filter(i => i.product_id !== id);
+  renderCart();
+}
+function setLineTech(id, v) { const l = S.cart.find(i => i.product_id === id); if (l) l.technician_id = v ? Number(v) : null; }
+function clearCart() {
+  S.cart = []; S.linkedJobId = null;
+  ['cart-plate', 'cart-model', 'cart-odo', 'cart-phone', 'cash-received'].forEach(i => $(i).value = '');
+  $('discount-input').value = 0; renderCart();
+}
+
+function renderCart() {
+  const has = S.cart.length > 0;
+  $('cart-empty').classList.toggle('hidden', has);
+  $('btn-checkout').disabled = !has;
+  const techOpts = sel => `<option value="">بدون فني</option>` + S.technicians.map(t => `<option value="${t.id}" ${sel == t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
+  $('cart-items').innerHTML = S.cart.map(l => {
+    const p = S.products.find(x => x.id === l.product_id);
+    return `<div class="bg-gray-50 dark:bg-navy-900/60 p-2.5 rounded-xl border border-gray-200/60 dark:border-gray-700/50">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex-1 min-w-0"><h5 class="text-xs font-bold truncate">${esc(p.name_ar)}</h5><div class="text-[10px] text-gray-400 font-mono">${money(p.price)} ر.س</div></div>
+        <div class="flex items-center gap-1">
+          <button onclick="changeQty(${p.id},-1)" class="w-6 h-6 rounded-md bg-white dark:bg-navy-700 font-bold text-xs">-</button>
+          <span class="text-xs font-bold w-5 text-center">${l.qty}</span>
+          <button onclick="changeQty(${p.id},1)" class="w-6 h-6 rounded-md bg-white dark:bg-navy-700 font-bold text-xs">+</button>
+        </div>
+        <div class="text-left min-w-[60px] text-xs font-bold">${money(p.price * l.qty)}</div>
+      </div>
+      <select onchange="setLineTech(${p.id},this.value)" class="inp !py-0.5 !text-[10px] mt-1.5">${techOpts(l.technician_id)}</select>
+    </div>`;
+  }).join('');
+  const job = S.linkedJobId && S.jobs.find(j => j.id === S.linkedJobId);
+  $('linked-job-tag').classList.toggle('hidden', !job);
+  if (job) $('linked-job-tag').textContent = 'أمر عمل #' + job.id;
+  renderTotals();
+}
+
+function calcTotals() {
+  const gross = r2(S.cart.reduce((s, l) => s + S.products.find(p => p.id === l.product_id).price * l.qty, 0));
+  const dv = Math.max(0, Number($('discount-input').value) || 0);
+  const disc = $('discount-type').value === 'percent' ? r2(gross * Math.min(dv, 100) / 100) : Math.min(dv, gross);
+  const total = r2(gross - disc);
+  const sub = r2(total / (1 + VAT_RATE));
+  return { gross, disc, total, sub, vat: r2(total - sub) };
+}
+
+function renderTotals() {
+  const t = calcTotals();
+  $('t-sub').textContent = money(t.sub); $('t-vat').textContent = money(t.vat);
+  $('t-total').textContent = money(t.total) + ' ر.س';
+  if (S.payMethod === 'split') onSplitInput(); else renderChange();
+}
+
+function renderPaymentButtons() {
+  $('payment-methods').innerHTML = ['cash', 'card', 'transfer', 'split'].map(m => `<button onclick="selectPayment('${m}')" class="rounded-lg py-1.5 text-[11px] font-bold transition ${S.payMethod === m ? 'bg-brandOrange-500 text-white' : 'bg-gray-200 dark:bg-navy-700 text-gray-700 dark:text-gray-300'}">${{ cash: 'نقدي', card: 'شبكة', transfer: 'تحويل', split: 'متعدد' }[m]}</button>`).join('');
+}
+function selectPayment(m) {
+  S.payMethod = m; renderPaymentButtons();
+  $('split-box').classList.toggle('hidden', m !== 'split');
+  $('cash-box').classList.toggle('hidden', m !== 'cash');
+  if (m === 'split') { $('pay-cash').value = ''; $('pay-card').value = ''; $('pay-transfer').value = ''; onSplitInput(); }
+}
+function renderChange() {
+  const rec = Number($('cash-received').value) || 0, total = calcTotals().total;
+  $('cash-change').textContent = rec ? (rec >= total ? 'الباقي: ' + money(rec - total) : 'ناقص: ' + money(total - rec)) : '';
+  $('cash-change').className = 'text-xs font-bold whitespace-nowrap ' + (rec && rec < total ? 'text-red-500' : 'text-emerald-500');
+}
+function onSplitInput(changed) {
+  const total = calcTotals().total;
+  const c = Number($('pay-cash').value) || 0, t = Number($('pay-transfer').value) || 0;
+  if (changed === 'cash' || changed === 'transfer') $('pay-card').value = Math.max(0, r2(total - c - t)) || '';
+  const sum = r2((Number($('pay-cash').value) || 0) + (Number($('pay-card').value) || 0) + (Number($('pay-transfer').value) || 0));
+  const ok = Math.abs(sum - total) < 0.005;
+  $('split-msg').textContent = ok ? 'المجموع مطابق ✓' : `المجموع ${money(sum)} — المطلوب ${money(total)}`;
+  $('split-msg').className = 'col-span-3 text-[10px] font-bold ' + (ok ? 'text-emerald-500' : 'text-red-500');
+  return ok;
+}
+
+/* =========================================================================
+   إصدار الفاتورة (من قاعدة البيانات)
+   ========================================================================= */
+let issuing = false;
+async function processInvoice() {
+  if (!S.cart.length || issuing) return;
+  if (!S.shift) { showToast('افتح وردية أولاً', 'warning'); openModal('modal-open-shift'); return; }
+  const t = calcTotals();
+  let pay = { paid_cash: 0, paid_card: 0, paid_transfer: 0 };
+  if (S.payMethod === 'cash') pay.paid_cash = t.total;
+  else if (S.payMethod === 'card') pay.paid_card = t.total;
+  else if (S.payMethod === 'transfer') pay.paid_transfer = t.total;
+  else {
+    if (!onSplitInput()) { showToast('مجموع الدفعات لا يساوي الإجمالي', 'warning'); return; }
+    pay = { paid_cash: r2(Number($('pay-cash').value) || 0), paid_card: r2(Number($('pay-card').value) || 0), paid_transfer: r2(Number($('pay-transfer').value) || 0) };
+  }
+  const odo = $('cart-odo').value;
+  const payload = {
+    job_id: S.linkedJobId, plate: $('cart-plate').value.trim() || null, model: $('cart-model').value.trim() || null,
+    odometer: odo ? Number(odo) : null, phone: $('cart-phone').value.trim() || null,
+    discount_type: $('discount-type').value, discount_value: Number($('discount-input').value) || 0,
+    ...pay, items: S.cart.map(l => ({ product_id: l.product_id, qty: l.qty, technician_id: l.technician_id }))
+  };
+  issuing = true; $('btn-checkout').disabled = true; $('btn-checkout').textContent = 'جاري الإصدار...';
+  let inv;
+  try {
+    inv = await rpc('issue_invoice', { p_payload: payload });
+    if (Array.isArray(inv)) inv = inv[0];
+  } catch (e) {
+    if (e.message !== 'no session') showToast(e.message, 'error');
+    issuing = false; $('btn-checkout').textContent = 'إصدار الفاتورة الإلكترونية'; $('btn-checkout').disabled = !S.cart.length;
+    return;
+  }
+  // الفاتورة صدرت فعلاً: نفرّغ السلة فوراً حتى لا تُصدر مرة ثانية بالخطأ
+  clearCart();
+  issuing = false; $('btn-checkout').textContent = 'إصدار الفاتورة الإلكترونية';
+  showToast('تم إصدار الفاتورة ' + inv.invoice_number, 'success');
+  try { await showReceipt(inv.id); }
+  catch (e) { showToast('صدرت الفاتورة لكن تعذر عرض الإيصال — أعد طباعتها من صفحة الوردية', 'warning'); }
+  try {
+    await Promise.all([loadProducts(), loadJobs()]);
+    renderProducts(); renderNav(); renderJobs(); renderInventory();
+  } catch (e) {}
+}
+
+async function showReceipt(invoiceId) {
+  const [rows, items] = await Promise.all([
+    api(`/invoices?id=eq.${invoiceId}&select=*`),
+    api(`/invoice_items?invoice_id=eq.${invoiceId}&select=name_ar,qty,line_total,technician_id&order=id`)
+  ]);
+  const inv = rows[0]; const s = S.settings;
+  $('rec-store').textContent = s.store_name; $('rec-address').textContent = s.address || '';
+  $('rec-cr').textContent = s.cr_number; $('rec-vat').textContent = s.vat_number;
+  $('rec-no').textContent = inv.invoice_number;
+  $('rec-date').textContent = new Date(inv.created_at).toLocaleString('ar-SA-u-ca-gregory', { dateStyle: 'short', timeStyle: 'short' });
+  $('rec-pay').textContent = payLabel(inv);
+  const veh = [['رقم اللوحة', inv.plate_number], ['السيارة', inv.vehicle_model], ['العداد', inv.odometer != null ? inv.odometer + ' كم' : null]].filter(x => x[1]);
+  $('rec-vehicle').classList.toggle('hidden', !veh.length);
+  $('rec-vehicle').innerHTML = veh.map(([k, v]) => `<div class="flex justify-between"><span>${k}:</span><span class="font-bold">${esc(v)}</span></div>`).join('');
+  $('rec-items').innerHTML = items.map(i => `<tr class="border-b border-gray-200"><td class="py-1 font-bold">${esc(i.name_ar)}</td><td class="text-center">${i.qty}</td><td class="text-left">${money(i.line_total)}</td></tr>`).join('');
+  $('rec-gross').textContent = money(inv.gross_total); $('rec-discount').textContent = money(inv.discount_amount);
+  $('rec-sub').textContent = money(inv.subtotal_excl_vat); $('rec-vat-total').textContent = money(inv.vat_amount);
+  $('rec-total').textContent = money(inv.total_incl_vat) + ' ر.س';
+  $('rec-qr').innerHTML = '';
+  new QRCode($('rec-qr'), { text: inv.qr_base64, width: 110, height: 110, correctLevel: QRCode.CorrectLevel.M });
+  openModal('modal-receipt');
+}
+
+function payLabel(inv) {
+  const parts = [['نقدي', inv.paid_cash], ['شبكة', inv.paid_card], ['تحويل', inv.paid_transfer]].filter(p => Number(p[1]) > 0);
+  if (parts.length <= 1) return parts[0]?.[0] || '—';
+  return parts.map(p => `${p[0]} ${money(p[1])}`).join(' + ');
+}
+
+/* =========================================================================
+   الورشة
+   ========================================================================= */
+async function loadJobs() { S.jobs = await api('/workshop_jobs?select=*&order=created_at.desc&limit=200'); }
+
+function renderJobs() {
+  const filters = [['active', 'النشطة'], ['completed', 'جاهزة للفوترة'], ['invoiced', 'تمت فوترتها'], ['all', 'الكل']];
+  $('job-filters').innerHTML = filters.map(([k, n]) => `<button onclick="S.jobFilter='${k}';renderJobs()" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border ${S.jobFilter === k ? 'bg-brandOrange-500 text-white border-brandOrange-500' : 'bg-white dark:bg-navy-800 border-gray-200 dark:border-gray-700'}">${n}</button>`).join('');
+  const list = S.jobs.filter(j => S.jobFilter === 'all' ? true
+    : S.jobFilter === 'active' ? ['waiting', 'in_progress', 'completed'].includes(j.status) : j.status === S.jobFilter);
+  if (!list.length) { $('jobs-grid').innerHTML = `<p class="text-xs text-gray-400 col-span-full text-center py-8">لا توجد أوامر عمل</p>`; return; }
+  $('jobs-grid').innerHTML = list.map(j => {
+    const st = STATUS[j.status]; const tech = S.technicians.find(t => t.id === j.technician_id);
+    const open = !['invoiced', 'cancelled'].includes(j.status);
+    return `<div class="bg-white dark:bg-navy-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex flex-col gap-3">
+      <div class="flex justify-between items-start">
+        <div><span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${st.cls}">${st.name}</span>
+          <h4 class="font-black text-base mt-1">${esc(j.plate_number)}</h4>
+          <p class="text-xs text-gray-500">${esc(j.vehicle_model || '')}${j.odometer != null ? ' • ' + j.odometer + ' كم' : ''}</p></div>
+        <span class="text-[10px] text-gray-400 font-mono">#${j.id}</span>
+      </div>
+      ${j.requested_service ? `<div class="bg-gray-50 dark:bg-navy-900/60 p-2.5 rounded-xl text-xs"><span class="text-gray-400 block text-[10px]">الخدمة المطلوبة</span><p class="font-bold">${esc(j.requested_service)}</p></div>` : ''}
+      <div class="text-xs text-gray-400">الفني: <strong class="text-gray-700 dark:text-gray-200">${esc(tech?.name || 'غير محدد')}</strong>${j.customer_phone ? ` • <span dir="ltr">${esc(j.customer_phone)}</span>` : ''}</div>
+      ${open ? `<div class="flex gap-1.5 flex-wrap">
+        ${st.next ? `<button onclick="setJobStatus(${j.id},'${st.next}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1.5 rounded-lg text-xs">${st.nextLbl}</button>` : ''}
+        <button onclick="transferJobToCart(${j.id})" class="flex-1 bg-brandOrange-500 hover:bg-brandOrange-600 text-white font-bold px-2 py-1.5 rounded-lg text-xs">تحويل للكاشير</button>
+        <button onclick="if(confirm('إلغاء أمر العمل؟'))setJobStatus(${j.id},'cancelled')" class="px-2 py-1.5 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10">إلغاء</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function openJobModal() { ['job-plate', 'job-model', 'job-odo', 'job-phone', 'job-service'].forEach(i => $(i).value = ''); openModal('modal-job'); }
+async function saveJob() {
+  const plate = $('job-plate').value.trim();
+  if (!plate) { showToast('أدخل رقم اللوحة', 'warning'); return; }
+  try {
+    await api('/workshop_jobs', { method: 'POST', prefer: 'return=minimal', body: {
+      plate_number: plate, vehicle_model: $('job-model').value.trim() || null,
+      odometer: $('job-odo').value ? Number($('job-odo').value) : null, customer_phone: $('job-phone').value.trim() || null,
+      requested_service: $('job-service').value.trim() || null,
+      technician_id: $('job-tech').value ? Number($('job-tech').value) : null, created_by: Auth.user?.sub
+    } });
+    closeModal('modal-job'); showToast('تم تسجيل السيارة', 'success');
+    await loadJobs(); renderJobs();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+async function setJobStatus(id, status) {
+  try {
+    await api(`/workshop_jobs?id=eq.${id}`, { method: 'PATCH', prefer: 'return=minimal', body: { status, updated_at: new Date().toISOString() } });
+    await loadJobs(); renderJobs();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+function transferJobToCart(id) {
+  const j = S.jobs.find(x => x.id === id); if (!j) return;
+  S.linkedJobId = id;
+  $('cart-plate').value = j.plate_number || ''; $('cart-model').value = j.vehicle_model || '';
+  $('cart-odo').value = j.odometer ?? ''; $('cart-phone').value = j.customer_phone || '';
+  $('cart-tech').value = j.technician_id || '';
+  S.cart.forEach(l => { if (!l.technician_id) l.technician_id = j.technician_id; });
+  switchTab('pos'); renderCart();
+  showToast('تم ربط السيارة ' + j.plate_number + ' بالفاتورة', 'info');
+}
+
+/* =========================================================================
+   المخزون
+   ========================================================================= */
+function renderInventory() {
+  $('inventory-tbody').innerHTML = S.products.map(p => {
+    const srv = isService(p), low = !srv && p.stock <= p.min_stock;
+    const badge = !p.is_active ? `<span class="bg-gray-200 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-full">موقوف</span>`
+      : srv ? `<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">خدمة</span>`
+      : low ? `<span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">تنبيه نقص</span>`
+      : `<span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">متوفر</span>`;
+    return `<tr class="hover:bg-gray-50 dark:hover:bg-navy-700/50">
+      <td class="p-3 font-mono font-bold">${esc(p.code)}</td><td class="p-3 font-mono text-gray-400">${esc(p.barcode || '—')}</td>
+      <td class="p-3 font-bold">${esc(p.name_ar)}</td><td class="p-3 text-gray-400">${esc(catById(p.category_id)?.name_ar || '')}</td>
+      <td class="p-3 font-bold">${money(p.price)}</td>${isAdmin() ? `<td class="p-3 text-gray-400">${money(p.cost)}</td>` : ''}
+      <td class="p-3">${money(p.commission)}</td>
+      <td class="p-3 font-extrabold ${low ? 'text-red-500' : ''}">${srv ? '—' : p.stock}</td><td class="p-3">${badge}</td>
+      <td class="p-3 text-center whitespace-nowrap">
+        ${p.is_active ? `<button onclick="addToCart(${p.id});switchTab('pos')" class="text-brandOrange-500 font-bold hover:underline">للسلة</button>` : ''}
+        ${isAdmin() ? `<button onclick="openProductModal(${p.id})" class="text-blue-500 font-bold hover:underline mr-2">تعديل</button>` : ''}
+      </td></tr>`;
+  }).join('');
+}
+
+function openProductModal(id) {
+  const p = id ? S.products.find(x => x.id === id) : null;
+  $('prod-modal-title').textContent = p ? 'تعديل صنف' : 'إضافة صنف جديد';
+  $('prod-category').innerHTML = S.categories.map(c => `<option value="${c.id}">${esc(c.name_ar)}</option>`).join('');
+  $('prod-id').value = p?.id || '';
+  $('prod-name').value = p?.name_ar || ''; $('prod-code').value = p?.code || '';
+  $('prod-barcode').value = p?.barcode || ''; $('prod-category').value = p?.category_id || S.categories[0]?.id;
+  $('prod-price').value = p?.price ?? ''; $('prod-cost').value = p?.cost ?? 0; $('prod-comm').value = p?.commission ?? 0;
+  $('prod-stock').value = p?.stock ?? 0; $('prod-min').value = p?.min_stock ?? 5; $('prod-active').checked = p ? p.is_active : true;
+  openModal('modal-product');
+}
+async function saveProduct() {
+  const id = $('prod-id').value;
+  const body = {
+    name_ar: $('prod-name').value.trim(), code: $('prod-code').value.trim(), barcode: $('prod-barcode').value.trim() || null,
+    category_id: $('prod-category').value, price: Number($('prod-price').value), cost: Number($('prod-cost').value) || 0,
+    commission: Number($('prod-comm').value) || 0, stock: Math.max(0, parseInt($('prod-stock').value) || 0),
+    min_stock: Math.max(0, parseInt($('prod-min').value) || 0), is_active: $('prod-active').checked, updated_at: new Date().toISOString()
+  };
+  if (!body.name_ar || !body.code || !(body.price >= 0) || $('prod-price').value === '') { showToast('أكمل الاسم والكود والسعر', 'warning'); return; }
+  try {
+    if (id) await api(`/products?id=eq.${id}`, { method: 'PATCH', prefer: 'return=minimal', body });
+    else await api('/products', { method: 'POST', prefer: 'return=minimal', body });
+    closeModal('modal-product'); showToast('تم الحفظ', 'success');
+    await loadProducts(); renderInventory(); renderProducts(); renderNav();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+/* =========================================================================
+   العمولات
+   ========================================================================= */
+function periodRange(k) {
+  const now = new Date(); let from, to = null;
+  if (k === 'today') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  else if (k === 'prev') { from = new Date(now.getFullYear(), now.getMonth() - 1, 1); to = new Date(now.getFullYear(), now.getMonth(), 1); }
+  else from = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: from.toISOString(), to: to?.toISOString() };
+}
+async function loadCommissions() {
+  $('tech-grid').innerHTML = `<div class="col-span-full flex justify-center py-8"><div class="spin"></div></div>`;
+  try {
+    const { from, to } = periodRange($('comm-period').value);
+    let q = `/invoice_items?select=technician_id,commission,qty,line_total,invoice_id,invoices!inner(created_at,status)&technician_id=not.is.null&invoices.status=eq.issued&invoices.created_at=gte.${encodeURIComponent(from)}`;
+    if (to) q += `&invoices.created_at=lt.${encodeURIComponent(to)}`;
+    const rows = await api(q);
+    $('tech-grid').innerHTML = S.technicians.map(t => {
+      const mine = rows.filter(r => r.technician_id === t.id);
+      const comm = mine.reduce((s, r) => s + Number(r.commission), 0);
+      const sales = mine.reduce((s, r) => s + Number(r.line_total), 0);
+      const jobs = new Set(mine.map(r => r.invoice_id)).size;
+      return `<div class="bg-white dark:bg-navy-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-3">
+        <div class="flex items-center gap-2"><div class="w-9 h-9 rounded-xl bg-brandOrange-500/10 text-brandOrange-500 font-black flex items-center justify-center">${esc(t.name.charAt(0))}</div>
+          <div><h4 class="font-black text-sm">${esc(t.name)}</h4><p class="text-[10px] text-gray-400">${esc(t.specialty || '')}</p></div></div>
+        <div class="grid grid-cols-3 gap-2 text-center pt-2 border-t border-gray-100 dark:border-gray-700">
+          <div class="bg-gray-50 dark:bg-navy-900 p-2 rounded-xl"><span class="text-[10px] text-gray-400 block">الفواتير</span><span class="text-sm font-black">${jobs}</span></div>
+          <div class="bg-gray-50 dark:bg-navy-900 p-2 rounded-xl"><span class="text-[10px] text-gray-400 block">المبيعات</span><span class="text-sm font-black">${money(sales)}</span></div>
+          <div class="bg-gray-50 dark:bg-navy-900 p-2 rounded-xl"><span class="text-[10px] text-gray-400 block">العمولة</span><span class="text-sm font-black text-brandOrange-500">${money(comm)}</span></div>
+        </div></div>`;
+    }).join('') || `<p class="text-xs text-gray-400 col-span-full text-center py-8">لا يوجد فنيون</p>`;
+  } catch (e) { showToast(e.message, 'error'); $('tech-grid').innerHTML = ''; }
+}
+function openTechModal() { $('tech-name').value = ''; $('tech-spec').value = ''; openModal('modal-tech'); }
+async function saveTech() {
+  const name = $('tech-name').value.trim(); if (!name) { showToast('أدخل اسم الفني', 'warning'); return; }
+  try {
+    await api('/technicians', { method: 'POST', prefer: 'return=minimal', body: { name, specialty: $('tech-spec').value.trim() || null } });
+    closeModal('modal-tech'); S.technicians = await api('/technicians?select=*&is_active=eq.true&order=id');
+    renderTechSelects(); loadCommissions(); showToast('تمت إضافة الفني', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+/* =========================================================================
+   الوردية والتقارير
+   ========================================================================= */
+async function loadShift() {
+  const rows = await api('/shifts?closed_at=is.null&select=*');
+  S.shift = rows[0] || null; renderShiftBadge();
+}
+function renderShiftBadge() {
+  const b = $('shift-badge');
+  b.className = 'hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-bold ' +
+    (S.shift ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20');
+  b.innerHTML = S.shift ? `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>وردية مفتوحة #${S.shift.id}` : `<span class="w-2 h-2 rounded-full bg-red-500"></span>لا توجد وردية — افتح`;
+}
+function onShiftBadge() { if (S.shift) { switchTab('reports'); openCloseShift(); } else { $('open-cash').value = 0; openModal('modal-open-shift'); } }
+
+async function openShift() {
+  try {
+    await rpc('open_shift', { p_opening_cash: Number($('open-cash').value) || 0 });
+    closeModal('modal-open-shift'); await loadShift(); showToast('تم فتح الوردية #' + S.shift.id, 'success');
+    if (S.tab === 'reports') loadReports();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function loadReports() {
+  await loadShift();
+  const s = S.shift;
+  $('rep-shift-tag').textContent = s ? 'وردية مفتوحة #' + s.id : 'لا توجد وردية مفتوحة';
+  $('rep-shift-info').textContent = s ? 'بدأت ' + new Date(s.opened_at).toLocaleString('ar-SA-u-ca-gregory', { dateStyle: 'short', timeStyle: 'short' }) + ' • رصيد افتتاحي ' + money(s.opening_cash) + ' ر.س' : 'افتح وردية لبدء إصدار الفواتير';
+  $('rep-shift-btn').textContent = s ? 'إغلاق الوردية والدرج (Z-Report)' : 'فتح وردية جديدة';
+  if (!s) { $('rep-stats').innerHTML = ''; $('rep-invoices').innerHTML = ''; S.shiftSummary = null; return; }
+  try {
+    const [sum, invs] = await Promise.all([
+      api(`/shift_summary?shift_id=eq.${s.id}`),
+      api(`/invoices?shift_id=eq.${s.id}&select=id,invoice_number,created_at,plate_number,total_incl_vat,paid_cash,paid_card,paid_transfer&order=id.desc`)
+    ]);
+    const z = S.shiftSummary = sum[0];
+    const stat = (lbl, val, cls) => `<div class="bg-white dark:bg-navy-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700"><div class="text-xs text-gray-400 font-bold">${lbl}</div><div class="text-xl font-black mt-1 ${cls}">${val}</div></div>`;
+    $('rep-stats').innerHTML = stat('مبيعات الوردية', money(z.total_sales), 'text-emerald-500') + stat('عدد الفواتير', z.invoices_count, '')
+      + stat('النقدي المتوقع بالدرج', money(Number(s.opening_cash) + Number(z.expected_cash_sales)), 'text-brandOrange-400')
+      + stat('الضريبة المحصلة', money(z.total_vat), 'text-purple-400');
+    $('rep-invoices').innerHTML = invs.length ? invs.map(i => `<tr class="hover:bg-gray-50 dark:hover:bg-navy-700/50">
+      <td class="p-2.5 font-mono font-bold">${esc(i.invoice_number)}</td>
+      <td class="p-2.5 text-gray-400">${new Date(i.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</td>
+      <td class="p-2.5 font-bold">${esc(i.plate_number || '—')}</td><td class="p-2.5">${payLabel(i)}</td>
+      <td class="p-2.5 font-black text-emerald-500">${money(i.total_incl_vat)}</td>
+      <td class="p-2.5 text-center"><button onclick="showReceipt(${i.id})" class="text-brandOrange-500 font-bold hover:underline">طباعة</button></td></tr>`).join('')
+      : `<tr><td colspan="6" class="text-center py-4 text-gray-400">لا توجد فواتير في هذه الوردية بعد</td></tr>`;
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function openCloseShift() {
+  if (!S.shiftSummary) { loadReports().then(() => S.shiftSummary && openCloseShift()); return; }
+  ['cnt-cash', 'cnt-card', 'cnt-transfer', 'cnt-notes'].forEach(i => $(i).value = '');
+  renderShiftDiff(); openModal('modal-close-shift');
+}
+function renderShiftDiff() {
+  const z = S.shiftSummary, s = S.shift; if (!z) return;
+  const rows = [['النقد', Number(s.opening_cash) + Number(z.expected_cash_sales), 'cnt-cash'], ['الشبكة', z.expected_card, 'cnt-card'], ['التحويل', z.expected_transfer, 'cnt-transfer']];
+  $('shift-diff').innerHTML = rows.map(([n, exp, id]) => {
+    const v = $(id).value; const d = v === '' ? null : r2(Number(v) - Number(exp));
+    return `<div class="flex justify-between"><span>${n}: المتوقع <b>${money(exp)}</b></span><span class="font-bold ${d == null ? 'text-gray-400' : d === 0 ? 'text-emerald-500' : 'text-red-500'}">${d == null ? '—' : d === 0 ? 'مطابق ✓' : (d > 0 ? 'زيادة ' : 'عجز ') + money(Math.abs(d))}</span></div>`;
+  }).join('');
+}
+async function closeShift() {
+  const v = id => $(id).value === '' ? null : Number($(id).value);
+  if (v('cnt-cash') == null) { showToast('أدخل النقد الموجود في الدرج', 'warning'); return; }
+  if (!confirm('إغلاق الوردية نهائياً؟ لن يمكن إصدار فواتير عليها بعد الإغلاق.')) return;
+  try {
+    const z = S.shiftSummary, s = S.shift;
+    await rpc('close_shift', { p_cash: v('cnt-cash'), p_card: v('cnt-card') ?? 0, p_transfer: v('cnt-transfer') ?? 0, p_notes: $('cnt-notes').value.trim() || null });
+    closeModal('modal-close-shift'); printZReport(s, z, { cash: v('cnt-cash'), card: v('cnt-card') ?? 0, transfer: v('cnt-transfer') ?? 0 });
+    showToast('تم إغلاق الوردية #' + s.id, 'success'); loadReports();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+function printZReport(s, z, c) {
+  const expCash = Number(s.opening_cash) + Number(z.expected_cash_sales);
+  const line = (k, v) => `<div class="flex justify-between"><span>${k}</span><span class="font-bold">${v}</span></div>`;
+  $('rec-store').textContent = S.settings.store_name; $('rec-address').textContent = 'تقرير إغلاق الوردية (Z-Report)';
+  $('rec-cr').textContent = S.settings.cr_number; $('rec-vat').textContent = S.settings.vat_number;
+  $('rec-no').textContent = 'وردية #' + s.id; $('rec-date').textContent = new Date().toLocaleString('ar-SA-u-ca-gregory', { dateStyle: 'short', timeStyle: 'short' });
+  $('rec-pay').textContent = S.me?.full_name || '';
+  $('rec-vehicle').classList.remove('hidden');
+  $('rec-vehicle').innerHTML = line('عدد الفواتير', z.invoices_count) + line('إجمالي المبيعات', money(z.total_sales)) + line('الضريبة', money(z.total_vat))
+    + line('الرصيد الافتتاحي', money(s.opening_cash)) + line('النقد المتوقع / الفعلي', money(expCash) + ' / ' + money(c.cash))
+    + line('الشبكة المتوقعة / الفعلية', money(z.expected_card) + ' / ' + money(c.card)) + line('التحويل المتوقع / الفعلي', money(z.expected_transfer) + ' / ' + money(c.transfer))
+    + line('فرق النقد', money(r2(c.cash - expCash)));
+  $('rec-items').innerHTML = ''; ['rec-gross', 'rec-discount', 'rec-sub', 'rec-vat-total', 'rec-total'].forEach(i => $(i).textContent = '');
+  $('rec-total').textContent = money(z.total_sales) + ' ر.س'; $('rec-qr').innerHTML = '';
+  openModal('modal-receipt');
+}
+
+/* =========================================================================
+   إعدادات المنشأة (المدير)
+   ========================================================================= */
+function openSettings() {
+  const s = S.settings;
+  $('set-name').value = s.store_name; $('set-cr').value = s.cr_number; $('set-vat').value = s.vat_number;
+  $('set-address').value = s.address || ''; $('set-phone').value = s.phone || ''; $('set-prefix').value = s.invoice_prefix;
+  openModal('modal-settings');
+}
+async function saveSettings() {
+  const body = { store_name: $('set-name').value.trim(), cr_number: $('set-cr').value.trim(), vat_number: $('set-vat').value.trim(),
+    address: $('set-address').value.trim() || null, phone: $('set-phone').value.trim() || null,
+    invoice_prefix: $('set-prefix').value.trim() || 'INV', updated_at: new Date().toISOString() };
+  if (!body.store_name || !body.cr_number) { showToast('أكمل الاسم والسجل التجاري', 'warning'); return; }
+  if (!/^3\d{13}3$/.test(body.vat_number)) { showToast('الرقم الضريبي يجب أن يكون 15 رقماً يبدأ وينتهي بـ 3', 'warning'); return; }
+  try {
+    await api('/settings?id=eq.1', { method: 'PATCH', prefer: 'return=minimal', body });
+    await loadSettings(); applyUser(); closeModal('modal-settings'); showToast('تم حفظ إعدادات المنشأة', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+/* =========================================================================
+   الموظفون (المدير)
+   ========================================================================= */
+let staffRows = [];
+async function loadStaffPending() {
+  if (!isAdmin()) return;
+  try {
+    staffRows = await rpc('list_auth_users', {});
+    const n = staffRows.filter(u => !u.role).length;
+    $('staff-pending').classList.toggle('hidden', !n); $('staff-pending').textContent = n;
+  } catch (e) {}
+}
+async function openStaff() {
+  openModal('modal-staff');
+  $('staff-list').innerHTML = `<div class="flex justify-center py-6"><div class="spin"></div></div>`;
+  await loadStaffPending();
+  const me = Auth.user?.sub;
+  $('staff-list').innerHTML = staffRows.map((u, i) => {
+    const pending = !u.role;
+    return `<div class="p-3 rounded-xl border ${pending ? 'border-amber-400/60 bg-amber-50 dark:bg-amber-500/5' : 'border-gray-200 dark:border-gray-700'} grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+      <div class="sm:col-span-4 min-w-0">
+        <input id="st-name-${i}" value="${esc(u.name || '')}" class="inp !py-1 font-bold">
+        <div class="text-[10px] text-gray-400 mt-0.5 truncate" dir="ltr">${esc(u.email)}</div>
+      </div>
+      <select id="st-role-${i}" class="inp !py-1 sm:col-span-3" ${u.user_id === me ? 'disabled' : ''}>
+        <option value="cashier" ${u.role === 'cashier' ? 'selected' : ''}>كاشير</option>
+        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>مدير</option>
+      </select>
+      <label class="sm:col-span-2 flex items-center gap-1.5 text-xs font-bold"><input type="checkbox" id="st-active-${i}" ${u.role ? (u.is_active ? 'checked' : '') : 'checked'} ${u.user_id === me ? 'disabled' : ''}> فعّال</label>
+      <button onclick="saveStaff(${i})" class="sm:col-span-3 ${pending ? 'bg-amber-500 hover:bg-amber-600' : 'bg-brandOrange-500 hover:bg-brandOrange-600'} text-white font-bold py-1.5 rounded-lg text-xs">${pending ? 'تفعيل الحساب' : 'حفظ'}</button>
+    </div>`;
+  }).join('') || `<p class="text-xs text-gray-400 text-center py-6">لا توجد حسابات</p>`;
+}
+async function saveStaff(i) {
+  const u = staffRows[i]; const name = $('st-name-' + i).value.trim();
+  if (!name) { showToast('أدخل اسم الموظف', 'warning'); return; }
+  try {
+    await rpc('set_staff', { p_user_id: u.user_id, p_full_name: name, p_role: $('st-role-' + i).value, p_active: $('st-active-' + i).checked });
+    showToast('تم حفظ ' + name, 'success'); openStaff();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+/* =========================================================================
+   بدء التشغيل: إن وُجدت جلسة سابقة ندخل مباشرة
+   ========================================================================= */
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.fixed.flex[id^="modal-"]').forEach(m => closeModal(m.id)); });
+(async () => {
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('token') && qs.has('reset')) { setAuthMode('newpass'); return; }
+  setAuthMode('signin');
+  setLoading(true, 'جاري التحقق من الجلسة...');
+  const jwt = await Auth.getJwt();
+  setLoading(false);
+  if (jwt) bootstrap();
+})();
+</script>
+</body>
+</html>
